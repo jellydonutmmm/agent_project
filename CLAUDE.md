@@ -17,6 +17,8 @@ An autonomous agent that monitors video game development industry trends (studio
 - Linter: ruff check — code should lint clean; fix warnings, don't suppress without a comment explaining why
 - Type checking: mypy — all new functions should have type hints
 - Naming: snake_case for functions/variables; keep tool functions (search, evaluate, notify) clearly separated, not interleaved
+- Logging: every module gets `logger = logging.getLogger(__name__)` and logs errors/warnings through it instead of printing; format/handler setup lives only in `logging_config.py`, configured once at the entry point
+- Error handling: every external call (Tavily, Anthropic, Slack) is wrapped at its boundary — catch there, log via the module's logger (`exc_info=True`), and degrade gracefully (skip the item/query, return a safe default) rather than letting the exception propagate and crash the caller. Set this shape up as part of writing the module, not bolted on afterward.
 
 ## Testing expectations
 
@@ -45,6 +47,7 @@ Fix any failures before reporting the task as complete.
   evaluate.py      — Claude evaluation step: structured relevance decision + reason
   notify.py        — Slack webhook notifier
   store.py         — SQLite persistence layer
+  logging_config.py — shared logging setup (consistent format across all modules); call `configure_logging()` once at the entry point (`agent.py`), never inside library modules
   agent.py         — orchestrates the full run: search → dedup → evaluate → notify → log
 /tests
 ```
@@ -67,7 +70,7 @@ Fix any failures before reporting the task as complete.
 - **Evaluation prompt:** the Claude call in `evaluate.py` should always return structured output (relevant: bool, reason: str) — never free text, since the reason field is what gets logged and used for debugging judgment quality
 - **LLM:** Claude (Sonnet) via the `anthropic` Python SDK, used for both the relevance-evaluation step and the Slack summary text
 - **Slack webhook:** set up via a Slack app's Incoming Webhooks feature — no OAuth flow needed, just a POST URL. Document any rate limits encountered.
-- **Run cadence:** [document the interval chosen once decided, e.g. every 6 hours via cron] and why that interval balances freshness against API cost
+- **Run cadence:** every 24 hours via cron. With the current 17-query `SEARCH_QUERIES` list, that's ~510 Tavily queries/month, comfortably under the 1,000/month free-tier limit (a 6-hour cadence would run ~2,040/month and exceed it). Daily freshness is an acceptable tradeoff for industry-trend news, which doesn't need same-hour surfacing.
 
 ## What "done" looks like for this project
 
