@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+from difflib import SequenceMatcher
 
-from src.store import get_by_url
+from src.store import get_all_titles, get_by_url
 
 logger = logging.getLogger(__name__)
 
@@ -22,3 +23,24 @@ def is_duplicate_url(conn: sqlite3.Connection, url: str) -> bool:
             "URL dedup check failed for %r; treating as not a duplicate", url
         )
         return False
+
+
+def is_duplicate_title(
+    conn: sqlite3.Connection, title: str, threshold: float = 0.85
+) -> bool:
+    """Return True if `title` is similar enough to a known item's title.
+
+    Uses difflib's SequenceMatcher ratio (0-1) against every stored title.
+    """
+    try:
+        known_titles = get_all_titles(conn)
+    except sqlite3.Error:
+        logger.warning(
+            "Title dedup check failed for %r; treating as not a duplicate", title
+        )
+        return False
+
+    return any(
+        SequenceMatcher(None, title, known_title).ratio() >= threshold
+        for _, known_title in known_titles
+    )
