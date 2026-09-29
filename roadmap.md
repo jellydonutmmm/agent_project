@@ -41,7 +41,7 @@ Establish this before any tool module is built, so every module (starting with `
 
 - [x] Implement URL-based exact match check against SQLite history
 - [x] Implement title similarity threshold matching
-- [ ] Choose and document the similarity threshold value and rationale
+- [x] Choose and document the similarity threshold value and rationale
 - [ ] Document known false-negative cases (e.g. same story, differently worded headline)
 - [ ] Write tests covering: exact duplicate, near-duplicate title, genuinely new item, edge cases near the threshold
 
