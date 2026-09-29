@@ -39,7 +39,7 @@ Establish this before any tool module is built, so every module (starting with `
 
 ## 4. `dedup.py` — duplicate detection
 
-- [ ] Implement URL-based exact match check against SQLite history
+- [x] Implement URL-based exact match check against SQLite history
 - [ ] Implement title similarity threshold matching
 - [ ] Choose and document the similarity threshold value and rationale
 - [ ] Document known false-negative cases (e.g. same story, differently worded headline)
