@@ -52,7 +52,9 @@ def test_search_dedupes_by_url_across_queries() -> None:
         [{"url": "https://example.com/a", "title": "Studio A layoffs"}]
     )
 
-    results = search.search(queries=["studio layoffs", "game studio news"], client=client)
+    results = search.search(
+        queries=["studio layoffs", "game studio news"], client=client
+    )
 
     assert len(results) == 1
     assert client.search.call_count == 2
