@@ -87,6 +87,44 @@ def test_is_duplicate_title_respects_custom_threshold(conn: sqlite3.Connection) 
     )
 
 
+def test_is_duplicate_title_true_just_above_threshold(conn: sqlite3.Connection) -> None:
+    store.insert_item(
+        conn,
+        url="https://example.com/a",
+        title="Major Publisher Announces Studio Layoffs This Week",
+        source="tavily",
+        found_at="2026-01-01T00:00:00Z",
+    )
+
+    # Ratio ~0.8515, just above the default 0.85 threshold.
+    assert (
+        dedup.is_duplicate_title(
+            conn, "Major Publisher Reveals Studio Layoffs This Weekend"
+        )
+        is True
+    )
+
+
+def test_is_duplicate_title_false_just_below_threshold(
+    conn: sqlite3.Connection,
+) -> None:
+    store.insert_item(
+        conn,
+        url="https://example.com/a",
+        title="Major Publisher Announces Studio Layoffs This Week",
+        source="tavily",
+        found_at="2026-01-01T00:00:00Z",
+    )
+
+    # Ratio ~0.8431, just below the default 0.85 threshold.
+    assert (
+        dedup.is_duplicate_title(
+            conn, "Major Publisher Reveals New Studio Layoffs This Week"
+        )
+        is False
+    )
+
+
 def test_is_duplicate_title_degrades_gracefully_on_db_error(
     conn: sqlite3.Connection, caplog: pytest.LogCaptureFixture
 ) -> None:
