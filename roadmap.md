@@ -47,7 +47,7 @@ Establish this before any tool module is built, so every module (starting with `
 
 ## 5. `evaluate.py` — Claude relevance evaluation
 
-- [ ] Design the evaluation prompt for video game industry relevance
+- [x] Design the evaluation prompt for video game industry relevance — `SYSTEM_PROMPT` in `evaluate.py`; leans "not relevant" when unsure
 - [ ] Implement structured output parsing: `relevant: bool`, `reason: str` (never free text)
 - [ ] Implement the Claude Sonnet call via `anthropic` SDK
 - [ ] Handle malformed/unexpected LLM output gracefully (retry or safe default + log)
