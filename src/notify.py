@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 
 import anthropic
 import requests
@@ -13,6 +14,12 @@ from src.search import SearchResult
 logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT_SECONDS = 10
+
+# Retry policy for transient Slack failures.
+MAX_ATTEMPTS = 3
+BACKOFF_BASE_SECONDS = 1.0
+# Cap on a server-supplied Retry-After so one run can't stall for minutes.
+MAX_RETRY_AFTER_SECONDS = 30.0
 
 MODEL = "claude-sonnet-5-5"
 # Room for adaptive thinking plus a two-sentence summary.
@@ -96,29 +103,78 @@ def build_message(
     return format_message(item, summarize_item(item, reason, client))
 
 
+def _is_transient(exc: requests.RequestException) -> bool:
+    """Worth retrying: no HTTP response (timeout, connection), 429, or 5xx."""
+    if exc.response is None:
+        return isinstance(exc, requests.Timeout | requests.ConnectionError)
+    status = exc.response.status_code
+    return status == 429 or status >= 500
+
+
+def _retry_delay(exc: requests.RequestException, attempt: int) -> float:
+    """Seconds to wait after a failed attempt: Slack's Retry-After on a 429,
+    otherwise exponential backoff (1s, 2s, 4s, ...)."""
+    if exc.response is not None and exc.response.status_code == 429:
+        try:
+            retry_after = float(exc.response.headers["Retry-After"])
+        except (KeyError, ValueError):
+            pass
+        else:
+            return min(max(retry_after, 0.0), MAX_RETRY_AFTER_SECONDS)
+    return BACKOFF_BASE_SECONDS * 2 ** (attempt - 1)
+
+
 def post_to_slack(text: str, webhook_url: str | None = None) -> bool:
     """POST a plain-text message to the Slack incoming webhook.
 
-    Returns True if Slack accepted it, False otherwise. Never raises.
+    Transient failures (timeouts, connection errors, 429, 5xx) are retried with
+    backoff, up to MAX_ATTEMPTS attempts; other failures (e.g. a revoked webhook
+    or a rejected payload) are not retried. Returns True if Slack accepted the
+    message, False otherwise. Never raises.
     """
     url = webhook_url or os.environ.get("SLACK_WEBHOOK_URL")
     if not url:
         logger.error("SLACK_WEBHOOK_URL is not set; cannot send notification")
         return False
 
-    try:
-        response = requests.post(
-            url, json={"text": text}, timeout=REQUEST_TIMEOUT_SECONDS
-        )
-        response.raise_for_status()
-    except requests.RequestException as exc:
-        # Deliberately no exc_info: the webhook URL is a secret, and requests
-        # exceptions embed it in their message, so a traceback would write it to
-        # agent.log. Log the exception type and status code only.
-        status = exc.response.status_code if exc.response is not None else None
-        logger.error(
-            "Slack notification failed: %s (status %s)", type(exc).__name__, status
-        )
-        return False
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            response = requests.post(
+                url, json={"text": text}, timeout=REQUEST_TIMEOUT_SECONDS
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            # Deliberately no exc_info: the webhook URL is a secret, and requests
+            # exceptions embed it in their message, so a traceback would write it
+            # to agent.log. Log the exception type and status code only.
+            status = exc.response.status_code if exc.response is not None else None
+            if not _is_transient(exc):
+                logger.error(
+                    "Slack notification failed permanently: %s (status %s)",
+                    type(exc).__name__,
+                    status,
+                )
+                return False
+            if attempt == MAX_ATTEMPTS:
+                logger.error(
+                    "Slack notification failed after %d attempts: %s (status %s)",
+                    MAX_ATTEMPTS,
+                    type(exc).__name__,
+                    status,
+                )
+                return False
+            delay = _retry_delay(exc, attempt)
+            logger.warning(
+                "Slack notification attempt %d/%d failed: %s (status %s); "
+                "retrying in %.1fs",
+                attempt,
+                MAX_ATTEMPTS,
+                type(exc).__name__,
+                status,
+                delay,
+            )
+            time.sleep(delay)
+        else:
+            return True
 
-    return True
+    return False  # unreachable; satisfies the type checker

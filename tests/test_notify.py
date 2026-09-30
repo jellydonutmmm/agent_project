@@ -13,9 +13,20 @@ from src.search import SearchResult
 WEBHOOK = "https://hooks.slack.com/services/T000/B000/SECRET"
 
 
-def _response(status_code: int = 200) -> MagicMock:
+@pytest.fixture(autouse=True)
+def sleep_mock(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Never really sleep in tests; lets tests assert on the backoff delays."""
+    mock = MagicMock()
+    monkeypatch.setattr(notify.time, "sleep", mock)
+    return mock
+
+
+def _response(
+    status_code: int = 200, headers: dict[str, str] | None = None
+) -> MagicMock:
     response = MagicMock()
     response.status_code = status_code
+    response.headers = headers or {}
     if status_code >= 400:
         response.raise_for_status.side_effect = requests.HTTPError(
             f"{status_code} for url: {WEBHOOK}", response=response
@@ -188,3 +199,116 @@ def test_build_message_combines_summary_and_format() -> None:
     message = notify.build_message(ITEM, "fallback reason", client=client)
 
     assert message == notify.format_message(ITEM, "Studio A laid off 50.")
+
+
+def _post_sequence(monkeypatch: pytest.MonkeyPatch, *outcomes: object) -> MagicMock:
+    """Mock requests.post to return/raise each outcome in turn."""
+    post = MagicMock(side_effect=list(outcomes))
+    monkeypatch.setattr(notify.requests, "post", post)
+    return post
+
+
+@pytest.mark.parametrize("status", [500, 502, 503])
+def test_post_to_slack_retries_5xx_then_succeeds(
+    monkeypatch: pytest.MonkeyPatch, sleep_mock: MagicMock, status: int
+) -> None:
+    post = _post_sequence(monkeypatch, _response(status), _response(200))
+
+    assert notify.post_to_slack("hello", webhook_url=WEBHOOK) is True
+
+    assert post.call_count == 2
+    sleep_mock.assert_called_once_with(notify.BACKOFF_BASE_SECONDS)
+
+
+@pytest.mark.parametrize(
+    "error", [requests.ConnectionError("down"), requests.Timeout("slow")]
+)
+def test_post_to_slack_retries_network_errors_then_succeeds(
+    monkeypatch: pytest.MonkeyPatch, error: requests.RequestException
+) -> None:
+    post = _post_sequence(monkeypatch, error, _response(200))
+
+    assert notify.post_to_slack("hello", webhook_url=WEBHOOK) is True
+    assert post.call_count == 2
+
+
+def test_post_to_slack_backoff_grows_exponentially(
+    monkeypatch: pytest.MonkeyPatch, sleep_mock: MagicMock
+) -> None:
+    post = _post_sequence(monkeypatch, _response(503), _response(503), _response(503))
+
+    assert notify.post_to_slack("hello", webhook_url=WEBHOOK) is False
+
+    assert post.call_count == notify.MAX_ATTEMPTS == 3
+    # No sleep after the final attempt.
+    assert [c.args[0] for c in sleep_mock.call_args_list] == [1.0, 2.0]
+
+
+def test_post_to_slack_exhausted_retries_logs_without_leaking_url(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    _post_sequence(monkeypatch, *[_response(503)] * notify.MAX_ATTEMPTS)
+
+    with caplog.at_level(logging.WARNING, logger="src.notify"):
+        assert notify.post_to_slack("hello", webhook_url=WEBHOOK) is False
+
+    assert "failed after 3 attempts" in caplog.text
+    assert "SECRET" not in caplog.text
+
+
+def test_post_to_slack_honors_retry_after_on_429(
+    monkeypatch: pytest.MonkeyPatch, sleep_mock: MagicMock
+) -> None:
+    _post_sequence(monkeypatch, _response(429, {"Retry-After": "7"}), _response(200))
+
+    assert notify.post_to_slack("hello", webhook_url=WEBHOOK) is True
+
+    sleep_mock.assert_called_once_with(7.0)
+
+
+def test_post_to_slack_caps_retry_after(
+    monkeypatch: pytest.MonkeyPatch, sleep_mock: MagicMock
+) -> None:
+    _post_sequence(monkeypatch, _response(429, {"Retry-After": "3600"}), _response(200))
+
+    assert notify.post_to_slack("hello", webhook_url=WEBHOOK) is True
+
+    sleep_mock.assert_called_once_with(notify.MAX_RETRY_AFTER_SECONDS)
+
+
+def test_post_to_slack_429_without_usable_retry_after_uses_backoff(
+    monkeypatch: pytest.MonkeyPatch, sleep_mock: MagicMock
+) -> None:
+    _post_sequence(
+        monkeypatch,
+        _response(429),
+        _response(429, {"Retry-After": "soon"}),
+        _response(200),
+    )
+
+    assert notify.post_to_slack("hello", webhook_url=WEBHOOK) is True
+
+    assert [c.args[0] for c in sleep_mock.call_args_list] == [1.0, 2.0]
+
+
+@pytest.mark.parametrize("status", [400, 403, 404])
+def test_post_to_slack_does_not_retry_permanent_http_errors(
+    monkeypatch: pytest.MonkeyPatch, sleep_mock: MagicMock, status: int
+) -> None:
+    post = _post_sequence(monkeypatch, _response(status))
+
+    assert notify.post_to_slack("hello", webhook_url=WEBHOOK) is False
+
+    assert post.call_count == 1
+    sleep_mock.assert_not_called()
+
+
+def test_post_to_slack_does_not_retry_invalid_url(
+    monkeypatch: pytest.MonkeyPatch, sleep_mock: MagicMock
+) -> None:
+    post = _post_sequence(monkeypatch, requests.exceptions.InvalidURL("bad"))
+
+    assert notify.post_to_slack("hello", webhook_url="not-a-url") is False
+
+    assert post.call_count == 1
+    sleep_mock.assert_not_called()
