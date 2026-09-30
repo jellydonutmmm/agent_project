@@ -55,7 +55,7 @@ Establish this before any tool module is built, so every module (starting with `
 
 ## 6. `notify.py` — Slack webhook notifier
 
-- [ ] Implement Slack webhook POST function
+- [x] Implement Slack webhook POST function — `post_to_slack()` in `notify.py`; returns True/False and never raises. Logs the exception type and status code only (no `exc_info`), because `requests` exceptions embed the secret webhook URL
 - [ ] Add LLM-generated summary text formatting for the notification message
 - [ ] Implement retry with backoff on transient failures
 - [ ] Document any Slack rate limits encountered
@@ -84,6 +84,7 @@ Establish this before any tool module is built, so every module (starting with `
 
 ## 10. Manual verification ("done" bar per CLAUDE.md)
 
+- [ ] Create and add the three credentials to `.env`: Tavily API key, Anthropic API key, Slack incoming webhook URL; confirm `.env` is gitignored
 - [ ] Run the full pipeline end-to-end locally against real APIs at least once
 - [ ] Manually verify a real Slack notification renders correctly (not just logged correctly)
 - [ ] Confirm a simulated failure (e.g. bad search result) doesn't halt the run
