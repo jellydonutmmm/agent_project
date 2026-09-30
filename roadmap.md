@@ -50,7 +50,7 @@ Establish this before any tool module is built, so every module (starting with `
 - [x] Design the evaluation prompt for video game industry relevance — `SYSTEM_PROMPT` in `evaluate.py`; leans "not relevant" when unsure
 - [x] Implement structured output parsing: `relevant: bool`, `reason: str` (never free text) — `EVALUATION_SCHEMA` (for constraining the response) plus `parse_evaluation()`, which raises `MalformedEvaluationError` on invalid output
 - [x] Implement the Claude Sonnet call via `anthropic` SDK — `evaluate()` calls `claude-sonnet-5-5` (effort `low`) with `EVALUATION_SCHEMA` and parses the reply; API errors and malformed output still propagate until the next item adds the boundary handling
-- [ ] Handle malformed/unexpected LLM output gracefully (retry or safe default + log)
+- [x] Handle malformed/unexpected LLM output gracefully (retry or safe default + log) — `evaluate()` now never raises: one retry on malformed output/refusal/`max_tokens`, then a safe default `Evaluation(relevant=False, failed=True)`; API errors are caught and logged at the boundary. The `failed` flag lets `agent.py` (Step 7) tell a failed evaluation from a real "not relevant" so failed items aren't marked evaluated
 - [ ] Write tests mocking the Anthropic client: valid structured output, malformed output, API failure
 
 ## 6. `notify.py` — Slack webhook notifier

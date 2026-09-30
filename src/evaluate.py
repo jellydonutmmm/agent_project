@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 MODEL = "claude-sonnet-5-5"
 # Room for adaptive thinking plus the short JSON answer.
 MAX_TOKENS = 2048
+# Attempts per item: one retry on malformed output.
+MAX_ATTEMPTS = 2
 
 SYSTEM_PROMPT = """\
 You screen news items for a monitor of video game development industry trends.
@@ -55,6 +57,8 @@ EVALUATION_SCHEMA: dict[str, Any] = {
 class Evaluation:
     relevant: bool
     reason: str
+    # True when no valid decision was obtained and this is the safe default.
+    failed: bool = False
 
 
 class MalformedEvaluationError(Exception):
@@ -92,15 +96,7 @@ def _format_item(item: SearchResult) -> str:
     )
 
 
-def evaluate(
-    item: SearchResult, client: anthropic.Anthropic | None = None
-) -> Evaluation:
-    """Ask Claude whether one search result is relevant.
-
-    Raises MalformedEvaluationError on invalid output; API errors propagate.
-    Boundary error handling and the safe default are added in the next roadmap step.
-    """
-    claude = client or _client()
+def _request_evaluation(claude: anthropic.Anthropic, item: SearchResult) -> Evaluation:
     response = claude.messages.create(
         model=MODEL,
         max_tokens=MAX_TOKENS,
@@ -111,5 +107,48 @@ def evaluate(
             "format": {"type": "json_schema", "schema": EVALUATION_SCHEMA},
         },
     )
+    if response.stop_reason in ("refusal", "max_tokens"):
+        raise MalformedEvaluationError(f"stop_reason={response.stop_reason}")
     text = next((b.text for b in response.content if b.type == "text"), "")
     return parse_evaluation(text)
+
+
+def evaluate(
+    item: SearchResult, client: anthropic.Anthropic | None = None
+) -> Evaluation:
+    """Ask Claude whether one search result is relevant. Never raises.
+
+    Malformed output (including refusals and truncation) is retried once. If no
+    valid answer is obtained, or the API call fails, returns a not-relevant
+    Evaluation with ``failed=True`` so the caller can tell it from a real decision.
+    """
+    try:
+        claude = client or _client()
+    except Exception:
+        logger.exception("Could not create Anthropic client")
+        return Evaluation(False, "evaluation failed: client setup error", failed=True)
+
+    last_error = "unknown error"
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            return _request_evaluation(claude, item)
+        except MalformedEvaluationError as exc:
+            last_error = str(exc)
+            logger.warning(
+                "Malformed evaluation for %s (attempt %d/%d): %s",
+                item.url,
+                attempt,
+                MAX_ATTEMPTS,
+                last_error,
+            )
+        except anthropic.APIError as exc:
+            # The SDK has already retried transient errors (429, 5xx, connection).
+            logger.exception("Anthropic call failed for %s", item.url)
+            return Evaluation(
+                False, f"evaluation failed: {type(exc).__name__}", failed=True
+            )
+        except Exception:
+            logger.exception("Unexpected error evaluating %s", item.url)
+            return Evaluation(False, "evaluation failed: unexpected error", failed=True)
+
+    return Evaluation(False, f"evaluation failed: {last_error}", failed=True)
