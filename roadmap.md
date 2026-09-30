@@ -56,7 +56,7 @@ Establish this before any tool module is built, so every module (starting with `
 ## 6. `notify.py` — Slack webhook notifier
 
 - [x] Implement Slack webhook POST function — `post_to_slack()` in `notify.py`; returns True/False and never raises. Logs the exception type and status code only (no `exc_info`), because `requests` exceptions embed the secret webhook URL
-- [ ] Add LLM-generated summary text formatting for the notification message
+- [x] Add LLM-generated summary text formatting for the notification message — `build_message()` in `notify.py` = `summarize_item()` (Sonnet, one or two plain sentences; falls back to the evaluation `reason` if the call fails) + `format_message()` (Slack mrkdwn: bold title, summary, source link; escapes `&`, `<`, `>`)
 - [ ] Implement retry with backoff on transient failures
 - [ ] Document any Slack rate limits encountered
 - [ ] Write tests mocking `requests` calls: success, transient failure + retry, permanent failure
