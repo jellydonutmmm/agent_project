@@ -58,13 +58,14 @@ Establish this before any tool module is built, so every module (starting with `
 - [x] Implement Slack webhook POST function — `post_to_slack()` in `notify.py`; returns True/False and never raises. Logs the exception type and status code only (no `exc_info`), because `requests` exceptions embed the secret webhook URL
 - [x] Add LLM-generated summary text formatting for the notification message — `build_message()` in `notify.py` = `summarize_item()` (Sonnet, one or two plain sentences; falls back to the evaluation `reason` if the call fails) + `format_message()` (Slack mrkdwn: bold title, summary, source link; escapes `&`, `<`, `>`)
 - [x] Implement retry with backoff on transient failures — `post_to_slack()` makes up to 3 attempts on timeouts, connection errors, 429 and 5xx (1s, 2s backoff; honors Slack's `Retry-After` on a 429, capped at 30s); other 4xx and invalid-URL errors are not retried
-- [ ] Document any Slack rate limits encountered
+- [x] Document any Slack rate limits encountered — published limit (~1 message/second per webhook, 429 + `Retry-After`) documented in the `notify.py` module docstring; no real limit observed yet, so add any actual 429s there after the Section 10 manual run
 - [ ] Write tests mocking `requests` calls: success, transient failure + retry, permanent failure
 
 ## 7. `agent.py` — orchestration
 
 - [ ] Add event-stream logging via Python's `logging` module: emit a log line at each pipeline stage (found, evaluated, decision, notified) as items move through, in addition to the row-state audit trail in `store.py`
 - [ ] Chain search → dedup → evaluate → notify → log as the only place these tools are combined
+- [ ] Space out Slack posts within a run (at least ~1 second apart, per Slack's webhook limit documented in `notify.py`) so several notifications in one run don't trigger 429s
 - [ ] Ensure a single item's failure (bad search result, malformed content) is caught/logged without halting the run
 - [ ] Add run-level logging/summary (items found, evaluated, notified, errored)
 - [ ] Write an end-to-end test with all external calls mocked, asserting the full run completes despite one failing item

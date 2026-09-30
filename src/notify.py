@@ -1,4 +1,14 @@
-"""Slack webhook notifier."""
+"""Slack webhook notifier.
+
+Slack rate limits (per Slack's published docs, https://docs.slack.dev/apis/web-api/rate-limits/):
+incoming webhooks allow about 1 message per second, with short bursts above that
+tolerated. Exceeding it returns HTTP 429 with a ``Retry-After`` header giving the
+seconds to wait; ``post_to_slack`` honors that header when retrying. Posting several
+notifications back to back can hit this, so ``agent.py`` is responsible for spacing
+its posts about a second apart (``post_to_slack`` itself sends immediately). No limit
+has been observed in practice yet; record any real 429s here after the Section 10
+manual run.
+"""
 
 from __future__ import annotations
 
