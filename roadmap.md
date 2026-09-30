@@ -59,7 +59,7 @@ Establish this before any tool module is built, so every module (starting with `
 - [x] Add LLM-generated summary text formatting for the notification message — `build_message()` in `notify.py` = `summarize_item()` (Sonnet, one or two plain sentences; falls back to the evaluation `reason` if the call fails) + `format_message()` (Slack mrkdwn: bold title, summary, source link; escapes `&`, `<`, `>`)
 - [x] Implement retry with backoff on transient failures — `post_to_slack()` makes up to 3 attempts on timeouts, connection errors, 429 and 5xx (1s, 2s backoff; honors Slack's `Retry-After` on a 429, capped at 30s); other 4xx and invalid-URL errors are not retried
 - [x] Document any Slack rate limits encountered — published limit (~1 message/second per webhook, 429 + `Retry-After`) documented in the `notify.py` module docstring; no real limit observed yet, so add any actual 429s there after the Section 10 manual run
-- [ ] Write tests mocking `requests` calls: success, transient failure + retry, permanent failure
+- [x] Write tests mocking `requests` calls: success, transient failure + retry, permanent failure — written alongside items 1–3 in `tests/test_notify.py`
 
 ## 7. `agent.py` — orchestration
 
