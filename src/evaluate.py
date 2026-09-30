@@ -7,7 +7,15 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
+import anthropic
+
+from src.search import SearchResult
+
 logger = logging.getLogger(__name__)
+
+MODEL = "claude-sonnet-5-5"
+# Room for adaptive thinking plus the short JSON answer.
+MAX_TOKENS = 2048
 
 SYSTEM_PROMPT = """\
 You screen news items for a monitor of video game development industry trends.
@@ -68,3 +76,40 @@ def parse_evaluation(text: str) -> Evaluation:
     if not isinstance(reason, str) or not reason.strip():
         raise MalformedEvaluationError("'reason' missing or empty")
     return Evaluation(relevant=relevant, reason=reason.strip())
+
+
+def _client() -> anthropic.Anthropic:
+    # Reads ANTHROPIC_API_KEY from the environment.
+    return anthropic.Anthropic()
+
+
+def _format_item(item: SearchResult) -> str:
+    return (
+        f"Title: {item.title}\n"
+        f"Source: {item.source or 'unknown'}\n"
+        f"URL: {item.url}\n"
+        f"Content: {item.content}"
+    )
+
+
+def evaluate(
+    item: SearchResult, client: anthropic.Anthropic | None = None
+) -> Evaluation:
+    """Ask Claude whether one search result is relevant.
+
+    Raises MalformedEvaluationError on invalid output; API errors propagate.
+    Boundary error handling and the safe default are added in the next roadmap step.
+    """
+    claude = client or _client()
+    response = claude.messages.create(
+        model=MODEL,
+        max_tokens=MAX_TOKENS,
+        system=SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": _format_item(item)}],
+        output_config={
+            "effort": "low",
+            "format": {"type": "json_schema", "schema": EVALUATION_SCHEMA},
+        },
+    )
+    text = next((b.text for b in response.content if b.type == "text"), "")
+    return parse_evaluation(text)
