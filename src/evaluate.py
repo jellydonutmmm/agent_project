@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import logging
+from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -27,3 +30,41 @@ minor item costs less than a noisy notification.
 
 Give a one or two sentence reason that names the specific development (or why there
 is none), so the decision can be audited later."""
+
+# JSON schema for the structured response: exactly these two fields, never free text.
+EVALUATION_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "relevant": {"type": "boolean"},
+        "reason": {"type": "string"},
+    },
+    "required": ["relevant", "reason"],
+    "additionalProperties": False,
+}
+
+
+@dataclass
+class Evaluation:
+    relevant: bool
+    reason: str
+
+
+class MalformedEvaluationError(Exception):
+    """Model output was not a valid {relevant: bool, reason: str} object."""
+
+
+def parse_evaluation(text: str) -> Evaluation:
+    """Parse model output into an Evaluation; raises MalformedEvaluationError."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise MalformedEvaluationError(f"not valid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise MalformedEvaluationError("expected a JSON object")
+    relevant = data.get("relevant")
+    reason = data.get("reason")
+    if not isinstance(relevant, bool):
+        raise MalformedEvaluationError("'relevant' missing or not a bool")
+    if not isinstance(reason, str) or not reason.strip():
+        raise MalformedEvaluationError("'reason' missing or empty")
+    return Evaluation(relevant=relevant, reason=reason.strip())

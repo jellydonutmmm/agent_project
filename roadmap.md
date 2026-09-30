@@ -48,7 +48,7 @@ Establish this before any tool module is built, so every module (starting with `
 ## 5. `evaluate.py` — Claude relevance evaluation
 
 - [x] Design the evaluation prompt for video game industry relevance — `SYSTEM_PROMPT` in `evaluate.py`; leans "not relevant" when unsure
-- [ ] Implement structured output parsing: `relevant: bool`, `reason: str` (never free text)
+- [x] Implement structured output parsing: `relevant: bool`, `reason: str` (never free text) — `EVALUATION_SCHEMA` (for constraining the response) plus `parse_evaluation()`, which raises `MalformedEvaluationError` on invalid output
 - [ ] Implement the Claude Sonnet call via `anthropic` SDK
 - [ ] Handle malformed/unexpected LLM output gracefully (retry or safe default + log)
 - [ ] Write tests mocking the Anthropic client: valid structured output, malformed output, API failure
