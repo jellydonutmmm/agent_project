@@ -34,7 +34,7 @@ Establish this before any tool module is built, so every module (starting with `
 - [x] Define initial query list for video game industry topics (studio hiring/layoffs, engine/platform shifts, funding/acquisitions/closures, publisher/studio news, independent studios)
 - [x] Implement a clearly-scoped `search()` function (input: query list, output: normalized result items)
 - [x] Keep Tavily-specific logic contained to this file
-- [x] Handle API errors/timeouts without crashing the caller
+- [x] Handle API errors/timeouts without crashing the caller — also skips malformed results (missing/empty `url` or `title`) and malformed responses with a logged warning, so one bad result can't abort `search()`
 - [x] Write tests mocking `tavily-python` responses, including a failure case
 
 ## 4. `dedup.py` — duplicate detection

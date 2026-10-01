@@ -94,3 +94,40 @@ def test_search_returns_empty_list_when_all_queries_fail() -> None:
     results = search.search(queries=["a", "b"], client=client)
 
     assert results == []
+
+
+def test_search_skips_malformed_results_and_keeps_the_rest(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = MagicMock()
+    client.search.return_value = _response(
+        [
+            {"title": "No url"},
+            {"url": "https://example.com/no-title"},
+            {"url": "", "title": "Empty url"},
+            "not a dict",  # type: ignore[list-item]
+            {"url": "https://example.com/ok", "title": "Good one"},
+        ]
+    )
+
+    with caplog.at_level(logging.WARNING, logger="src.search"):
+        results = search.search(queries=["q"], client=client)
+
+    assert [r.url for r in results] == ["https://example.com/ok"]
+    assert caplog.text.count("Skipping malformed Tavily result") == 4
+
+
+def test_search_skips_query_with_malformed_response(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = MagicMock()
+    client.search.side_effect = [
+        {"unexpected": "shape"},
+        _response([{"url": "https://example.com/ok", "title": "Good one"}]),
+    ]
+
+    with caplog.at_level(logging.WARNING, logger="src.search"):
+        results = search.search(queries=["bad", "good"], client=client)
+
+    assert [r.url for r in results] == ["https://example.com/ok"]
+    assert "Malformed Tavily response for query 'bad'" in caplog.text

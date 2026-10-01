@@ -71,18 +71,38 @@ def search(
             logger.warning("Tavily search failed for query %r", query, exc_info=True)
             continue
 
-        for raw in response["results"]:
-            url = raw["url"]
-            if url in seen_urls:
-                continue
-            seen_urls.add(url)
-            results.append(
-                SearchResult(
+        try:
+            raw_results = list(response["results"])
+        except (KeyError, TypeError):
+            logger.warning(
+                "Malformed Tavily response for query %r", query, exc_info=True
+            )
+            continue
+
+        for raw in raw_results:
+            try:
+                url = raw["url"]
+                title = raw["title"]
+                if not url or not title:
+                    raise ValueError("empty url or title")
+                if url in seen_urls:
+                    continue
+                result = SearchResult(
                     url=url,
-                    title=raw["title"],
+                    title=title,
                     source=raw.get("source"),
                     content=raw.get("content", ""),
                 )
-            )
+            except (KeyError, TypeError, AttributeError, ValueError):
+                # One malformed result shouldn't discard the rest of the query.
+                logger.warning(
+                    "Skipping malformed Tavily result for query %r: %r",
+                    query,
+                    raw,
+                    exc_info=True,
+                )
+                continue
+            seen_urls.add(url)
+            results.append(result)
 
     return results
