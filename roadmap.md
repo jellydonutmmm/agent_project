@@ -67,7 +67,7 @@ Establish this before any tool module is built, so every module (starting with `
 - [x] Chain search → dedup → evaluate → notify → log as the only place these tools are combined — `run()` / `process_item()` in `agent.py`; items are inserted on find, a failed evaluation leaves the row unevaluated, a failed Slack post leaves `notified_at` unset; tests in `tests/test_agent.py`
 - [x] Space out Slack posts within a run (at least ~1 second apart, per Slack's webhook limit documented in `notify.py`) so several notifications in one run don't trigger 429s — `_wait_for_post_slot()` in `agent.py` sleeps up to `MIN_POST_INTERVAL_SECONDS` before each post after the first
 - [x] Ensure a single item's failure (bad search result, malformed content) is caught/logged without halting the run — `run()` wraps each `process_item()` call, logging the traceback and moving on to the next item
-- [ ] Add run-level logging/summary (items found, evaluated, notified, errored)
+- [x] Add run-level logging/summary (items found, evaluated, notified, errored) — `run()` returns a `RunSummary` (also searched and duplicates; `errored` = failed evaluations + failed Slack posts + unexpected exceptions) and logs it as one `run summary:` line
 - [ ] Write an end-to-end test with all external calls mocked, asserting the full run completes despite one failing item
 
 ## 8. Quality gate (run before every commit / before marking any task done)

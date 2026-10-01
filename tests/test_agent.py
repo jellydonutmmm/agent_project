@@ -147,7 +147,34 @@ def test_run_continues_after_an_item_raises(
         _item("https://a.com/1", "First story about layoffs"),
         _item("https://b.com/2", "Completely different acquisition news"),
     ]
-    agent.run(conn)
+    summary = agent.run(conn)
 
+    assert summary.errored == 1 and summary.notified == 1
     assert mocks["post"].call_count == 1
     assert "error processing item 'https://a.com/1'" in caplog.text
+
+
+def test_run_summary_counts_each_outcome(
+    conn: sqlite3.Connection,
+    mocks: dict[str, MagicMock],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger="src.agent")
+    store.insert_item(conn, "https://old.com/1", "Already seen story", "x", "t")
+    mocks["search"].return_value = [
+        _item("https://old.com/1", "Already seen story"),  # duplicate
+        _item("https://a.com/1", "Relevant layoffs story"),  # notified
+        _item("https://b.com/2", "Unrelated trivia"),  # not relevant
+        _item("https://c.com/3", "Evaluation will fail here"),  # errored
+    ]
+    mocks["evaluate"].side_effect = [
+        Evaluation(True, "big"),
+        Evaluation(False, "noise"),
+        Evaluation(False, "boom", failed=True),
+    ]
+    summary = agent.run(conn)
+
+    assert summary == agent.RunSummary(
+        searched=4, duplicates=1, found=3, evaluated=2, notified=1, errored=1
+    )
+    assert "run summary: searched=4 duplicates=1 found=3" in caplog.text
