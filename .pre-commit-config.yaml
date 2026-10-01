@@ -30,3 +30,12 @@ repos:
         name: detect-secrets
         entry: detect-secrets-hook --baseline .secrets.baseline
         language: system
+      # Needs network, so not run on every commit. Run on demand:
+      #   pre-commit run --hook-stage manual pip-audit
+      - id: pip-audit
+        name: pip-audit (known-vulnerable dependencies)
+        entry: pip-audit -r requirements.txt
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [manual]

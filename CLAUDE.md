@@ -37,7 +37,7 @@ mypy .
 pytest
 ```
 
-mypy runs in strict mode (`mypy.ini`). The same checks plus a `detect-secrets` scan run automatically as a pre-commit hook (`.pre-commit-config.yaml`; one-time setup `pre-commit install`; commit with the venv active). If a secret scan flags a false positive, add `# pragma: allowlist secret` on the line rather than editing the baseline by hand.
+mypy runs in strict mode (`mypy.ini`), and `pytest` enforces 90% coverage of `src/` (`pytest.ini`). Periodically, and before deploying, also run `pip-audit -r requirements.txt` (manual hook; needs network). The same checks plus a `detect-secrets` scan run automatically as a pre-commit hook (`.pre-commit-config.yaml`; one-time setup `pre-commit install`; commit with the venv active). If a secret scan flags a false positive, add `# pragma: allowlist secret` on the line rather than editing the baseline by hand.
 
 Fix any failures before reporting the task as complete.
 

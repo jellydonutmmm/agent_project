@@ -77,9 +77,10 @@ Enforced automatically on every commit by a pre-commit hook (`.pre-commit-config
 - [x] `ruff format --check .` — check-only; run `ruff format .` first to apply fixes
 - [x] `ruff check .` — clean, or warnings fixed with a comment explaining any suppression
 - [x] `mypy .` — strict mode (`mypy.ini`); all functions have type hints
-- [x] `pytest` — full suite passes
+- [x] `pytest` — full suite passes, with coverage of `src/` at or above 90% (`pytest.ini`; currently 97%)
 - [x] Secret scan — `detect-secrets` against `.secrets.baseline`; blocks commits containing API keys or webhook URLs
-- [x] Pre-commit hook runs all of the above on every commit
+- [x] `pip-audit -r requirements.txt` — flags known-vulnerable dependencies; needs network, so it's a manual hook (`pre-commit run --hook-stage manual pip-audit`), not run on every commit
+- [x] Pre-commit hook runs the checks above (except `pip-audit`) on every commit
 
 ## 9. Scheduling & deployment
 
