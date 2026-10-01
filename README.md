@@ -46,6 +46,23 @@ pip install -r requirements.txt
 python agent.py
 ```
 
+## Credentials
+
+Keys go in `.env` locally (gitignored) and in GitHub repository secrets for the scheduled run. Never paste them into code, chat or commits.
+
+### Anthropic
+Purpose: relevance evaluation and Slack summaries (Claude Sonnet).
+Env var: `ANTHROPIC_API_KEY`
+Limits / cost: pay-as-you-go, roughly pennies per day at one evaluation per new item plus a short summary per relevant one. The monthly spend cap below bounds the worst case.
+1. Go to https://console.anthropic.com and sign in (separate from a claude.ai chat subscription).
+2. Under Settings → Billing, add a card and a small amount of credit (e.g. $5), then set a monthly spend limit (e.g. $5-10).
+3. Under Settings → API keys, create a key named `game-news-agent`, with a 90-day expiry if offered.
+4. Copy it once (it starts with `sk-ant-`) and add `ANTHROPIC_API_KEY=<value>` to `.env`.
+5. Verify with one small real call before a full run.
+6. For the scheduled run, add the same value as a repository secret named `ANTHROPIC_API_KEY` (Settings → Secrets and variables → Actions).
+
+Rotate / revoke: on the same API keys page, create a new key, update `.env` and the GitHub secret, then delete the old key. Do this before the 90-day expiry (set a calendar reminder about a week ahead): an expired key makes every evaluation fail and the run posts nothing to Slack, which looks like a quiet news day.
+
 ## Search topics
 
 Queries cover video game development industry signals: studio layoffs/closures, hiring surges, engine and platform trends (Unreal, Unity, Godot), funding/acquisitions, and major publisher/studio announcements. The exact query list lives in `search.py`.
