@@ -77,7 +77,7 @@ Fix any failures before reporting the task as complete.
 - **Evaluation prompt:** the Claude call in `evaluate.py` should always return structured output (relevant: bool, reason: str) — never free text, since the reason field is what gets logged and used for debugging judgment quality
 - **LLM:** Claude (Sonnet) via the `anthropic` Python SDK, used for both the relevance-evaluation step and the Slack summary text
 - **Slack webhook:** set up via a Slack app's Incoming Webhooks feature — no OAuth flow needed, just a POST URL. Document any rate limits encountered.
-- **Run cadence:** every 24 hours via cron. With the current 17-query `SEARCH_QUERIES` list, that's ~510 Tavily queries/month, comfortably under the 1,000/month free-tier limit (a 6-hour cadence would run ~2,040/month and exceed it). Daily freshness is an acceptable tradeoff for industry-trend news, which doesn't need same-hour surfacing.
+- **Run cadence:** every 24 hours via a GitHub Actions scheduled workflow (`.github/workflows/daily-run.yml`; free for public repos, no personal machine needed). The SQLite history persists between runs on a `state` branch (restored before, saved after each run; public, holds no secrets). Secrets are GitHub repository secrets, never committed. With the current 17-query `SEARCH_QUERIES` list, that's ~510 Tavily queries/month, comfortably under the 1,000/month free-tier limit (a 6-hour cadence would run ~2,040/month and exceed it). Daily freshness is an acceptable tradeoff for industry-trend news, which doesn't need same-hour surfacing.
 
 ## What "done" looks like for this project
 

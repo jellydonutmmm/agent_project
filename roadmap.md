@@ -85,8 +85,10 @@ Enforced automatically on every commit by a pre-commit hook (`.pre-commit-config
 ## 9. Scheduling & deployment
 
 - [x] Decide and document run cadence (every 24 hours — ~510 Tavily queries/month vs. the 1,000/month free-tier limit) and the freshness-vs-API-cost tradeoff
-- [ ] Set up cron (or equivalent scheduler) to invoke `agent.py`
-- [ ] Verify `.env` secrets are available in the scheduled environment (not committed)
+- [x] Set up the scheduler: a GitHub Actions scheduled workflow (`.github/workflows/daily-run.yml`, daily at 13:00 UTC, plus a manual "Run workflow" button) replaces cron, so the agent doesn't depend on a personal machine being on. Free for public repos. Runners are ephemeral, so `agent.db` is restored from / saved to a dedicated `state` branch each run (a single force-pushed commit, so it never grows; public along with the repo, holds only news URLs/titles and reasons)
+- [ ] Add the three secrets (`TAVILY_API_KEY`, `ANTHROPIC_API_KEY`, `SLACK_WEBHOOK_URL`) as GitHub repository secrets (Settings → Secrets and variables → Actions) — requires the credentials from Section 10
+- [ ] Trigger the workflow manually once and confirm: the run succeeds, the `state` branch appears with `agent.db`, and a second manual run skips items as duplicates
+- [ ] Confirm scheduled runs keep firing (GitHub disables scheduled workflows in repos with no activity for 60 days; re-enable from the Actions tab if that happens)
 
 ## 10. Manual verification ("done" bar per CLAUDE.md)
 

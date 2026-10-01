@@ -1,0 +1,83 @@
+# Runs the agent once a day on GitHub's servers (free for public repos), so it
+# doesn't depend on any personal machine being on.
+#
+# Runners are ephemeral, so the SQLite history (agent.db) lives on a dedicated
+# `state` branch: restored before the run, saved after it. The repo is public,
+# so that branch is public too; it holds only news URLs/titles and the model's
+# relevance reasons, never secrets. Each save replaces the branch with a single
+# fresh commit, so it never grows with history.
+name: Daily run
+
+on:
+  schedule:
+    - cron: "0 13 * * *" # 13:00 UTC daily; GitHub may start it a few minutes late
+  workflow_dispatch: # manual "Run workflow" button, for testing
+
+permissions:
+  contents: write # push the `state` branch
+
+# Never run two at once: they would overwrite each other's saved history.
+concurrency:
+  group: daily-run
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Restore history from the state branch
+        run: |
+          if git ls-remote --exit-code --heads origin state > /dev/null; then
+            git fetch --depth=1 origin state
+            git show FETCH_HEAD:agent.db > agent.db
+            echo "Restored agent.db"
+          else
+            echo "No state branch yet; starting with an empty history"
+          fi
+
+      - name: Run the agent
+        env:
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python -m src.agent
+
+      # always(): even if the run failed partway, keep what it already recorded,
+      # otherwise items already posted to Slack would be posted again tomorrow.
+      - name: Save history to the state branch
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -f agent.db ]; then
+            echo "No agent.db to save"
+            exit 0
+          fi
+          snapshot="$(mktemp -d)"
+          cp agent.db "$snapshot/"
+          cd "$snapshot"
+          git init -q -b state
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add agent.db
+          git commit -q -m "Save agent history ($(date -u +%Y-%m-%dT%H:%MZ))"
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" state
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-log
+          path: agent.log
+          retention-days: 14
+          if-no-files-found: ignore

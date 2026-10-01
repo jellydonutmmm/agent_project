@@ -19,7 +19,7 @@ Built partly as a practical tool for tracking my own field (game development), a
 ## Architecture
 
 ```
-Scheduled run (cron)
+Scheduled run (GitHub Actions, daily)
   → Search step: Tavily API queries video game industry topics
   → Dedup: check against SQLite history
   → Evaluation step: Claude judges relevance, returns structured decision + reason
