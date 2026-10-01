@@ -100,7 +100,7 @@ Enforced automatically on every commit by a pre-commit hook (`.pre-commit-config
     - [x] Create a Slack app for that workspace and turn on Incoming Webhooks
     - [x] Add a webhook to the channel and copy its URL
     - [x] Set the channel's notification preference to "all new messages" on desktop and phone
-- [ ] Run the full pipeline end-to-end locally against real APIs at least once
+- [x] Run the full pipeline end-to-end locally against real APIs at least once — 2026-10-01: searched 78, found 76, evaluated 76, notified 21, errored 0, in 4m48s (about 4s per item, mostly the evaluation call)
 - [ ] Manually verify a real Slack notification renders correctly (not just logged correctly)
 - [ ] Confirm a simulated failure (e.g. bad search result) doesn't halt the run
 
