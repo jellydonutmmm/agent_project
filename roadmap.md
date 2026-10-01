@@ -72,10 +72,14 @@ Establish this before any tool module is built, so every module (starting with `
 
 ## 8. Quality gate (run before every commit / before marking any task done)
 
-- [ ] `ruff format .`
-- [ ] `ruff check .` — clean, or warnings fixed with a comment explaining any suppression
-- [ ] `mypy .` — all new functions have type hints
-- [ ] `pytest` — full suite passes
+Enforced automatically on every commit by a pre-commit hook (`.pre-commit-config.yaml`; run `pre-commit install` once per clone, and commit with the venv activated).
+
+- [x] `ruff format --check .` — check-only; run `ruff format .` first to apply fixes
+- [x] `ruff check .` — clean, or warnings fixed with a comment explaining any suppression
+- [x] `mypy .` — strict mode (`mypy.ini`); all functions have type hints
+- [x] `pytest` — full suite passes
+- [x] Secret scan — `detect-secrets` against `.secrets.baseline`; blocks commits containing API keys or webhook URLs
+- [x] Pre-commit hook runs all of the above on every commit
 
 ## 9. Scheduling & deployment
 

@@ -1,5 +1,6 @@
 import logging
 import sqlite3
+import time
 from collections.abc import Iterator
 from unittest.mock import MagicMock
 
@@ -27,7 +28,7 @@ def _item(
 def sleep_mock(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     """Never really sleep in tests; reset the post-spacing state."""
     mock = MagicMock()
-    monkeypatch.setattr(agent.time, "sleep", mock)
+    monkeypatch.setattr(time, "sleep", mock)
     monkeypatch.setattr(agent, "_last_post_at", None)
     return mock
 
@@ -126,7 +127,7 @@ def test_posts_are_spaced_apart(
     sleep_mock: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(agent.time, "monotonic", MagicMock(return_value=100.0))
+    monkeypatch.setattr(time, "monotonic", MagicMock(return_value=100.0))
     agent.process_item(conn, _item("https://a.com/1", "First story about layoffs"))
     sleep_mock.assert_not_called()  # first post never waits
 

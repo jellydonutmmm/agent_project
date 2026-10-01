@@ -31,10 +31,13 @@ An autonomous agent that monitors video game development industry trends (studio
 ## Before finishing any task, run:
 
 ```bash
+ruff format .
 ruff check .
 mypy .
 pytest
 ```
+
+mypy runs in strict mode (`mypy.ini`). The same checks plus a `detect-secrets` scan run automatically as a pre-commit hook (`.pre-commit-config.yaml`; one-time setup `pre-commit install`; commit with the venv active). If a secret scan flags a false positive, add `# pragma: allowlist secret` on the line rather than editing the baseline by hand.
 
 Fix any failures before reporting the task as complete.
 

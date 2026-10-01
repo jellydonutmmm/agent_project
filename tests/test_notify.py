@@ -1,4 +1,5 @@
 import logging
+import time
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -17,7 +18,7 @@ WEBHOOK = "https://hooks.slack.com/services/T000/B000/SECRET"
 def sleep_mock(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     """Never really sleep in tests; lets tests assert on the backoff delays."""
     mock = MagicMock()
-    monkeypatch.setattr(notify.time, "sleep", mock)
+    monkeypatch.setattr(time, "sleep", mock)
     return mock
 
 
@@ -36,7 +37,7 @@ def _response(
 
 def test_post_to_slack_success(monkeypatch: pytest.MonkeyPatch) -> None:
     post = MagicMock(return_value=_response(200))
-    monkeypatch.setattr(notify.requests, "post", post)
+    monkeypatch.setattr(requests, "post", post)
 
     assert notify.post_to_slack("hello", webhook_url=WEBHOOK) is True
 
@@ -47,7 +48,7 @@ def test_post_to_slack_success(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_post_to_slack_reads_url_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     post = MagicMock(return_value=_response(200))
-    monkeypatch.setattr(notify.requests, "post", post)
+    monkeypatch.setattr(requests, "post", post)
     monkeypatch.setenv("SLACK_WEBHOOK_URL", WEBHOOK)
 
     assert notify.post_to_slack("hello") is True
@@ -59,7 +60,7 @@ def test_post_to_slack_missing_url_returns_false(
 ) -> None:
     monkeypatch.delenv("SLACK_WEBHOOK_URL", raising=False)
     post = MagicMock()
-    monkeypatch.setattr(notify.requests, "post", post)
+    monkeypatch.setattr(requests, "post", post)
 
     with caplog.at_level(logging.ERROR, logger="src.notify"):
         assert notify.post_to_slack("hello") is False
@@ -71,7 +72,7 @@ def test_post_to_slack_missing_url_returns_false(
 def test_post_to_slack_http_error_returns_false_without_leaking_url(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    monkeypatch.setattr(notify.requests, "post", MagicMock(return_value=_response(500)))
+    monkeypatch.setattr(requests, "post", MagicMock(return_value=_response(500)))
 
     with caplog.at_level(logging.ERROR, logger="src.notify"):
         assert notify.post_to_slack("hello", webhook_url=WEBHOOK) is False
@@ -85,7 +86,7 @@ def test_post_to_slack_connection_error_returns_false_without_leaking_url(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     monkeypatch.setattr(
-        notify.requests,
+        requests,
         "post",
         MagicMock(side_effect=requests.ConnectionError(f"failed: {WEBHOOK}")),
     )
@@ -204,7 +205,7 @@ def test_build_message_combines_summary_and_format() -> None:
 def _post_sequence(monkeypatch: pytest.MonkeyPatch, *outcomes: object) -> MagicMock:
     """Mock requests.post to return/raise each outcome in turn."""
     post = MagicMock(side_effect=list(outcomes))
-    monkeypatch.setattr(notify.requests, "post", post)
+    monkeypatch.setattr(requests, "post", post)
     return post
 
 

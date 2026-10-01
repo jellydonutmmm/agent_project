@@ -7,12 +7,14 @@ boundaries.
 
 import json
 import logging
+import time
 from collections.abc import Iterator
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+import requests
 
 from src import agent, evaluate, notify, search, store
 
@@ -83,10 +85,10 @@ def test_full_run_completes_despite_one_failing_item(
     monkeypatch.setattr(notify, "_client", lambda: claude)
 
     post = MagicMock()
-    monkeypatch.setattr(notify.requests, "post", post)
+    monkeypatch.setattr(requests, "post", post)
     monkeypatch.setenv("SLACK_WEBHOOK_URL", WEBHOOK)
 
-    monkeypatch.setattr(agent.time, "sleep", MagicMock())
+    monkeypatch.setattr(time, "sleep", MagicMock())
     monkeypatch.setattr(agent, "_last_post_at", None)
 
     summary = agent.run(conn)

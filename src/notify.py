@@ -131,7 +131,7 @@ def _retry_delay(exc: requests.RequestException, attempt: int) -> float:
             pass
         else:
             return min(max(retry_after, 0.0), MAX_RETRY_AFTER_SECONDS)
-    return BACKOFF_BASE_SECONDS * 2 ** (attempt - 1)
+    return BACKOFF_BASE_SECONDS * 2.0 ** (attempt - 1)
 
 
 def post_to_slack(text: str, webhook_url: str | None = None) -> bool:

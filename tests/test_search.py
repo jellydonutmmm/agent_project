@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -6,7 +7,7 @@ import pytest
 from src import search
 
 
-def _response(results: list[dict]) -> dict:
+def _response(results: list[dict[str, Any]]) -> dict[str, Any]:
     return {"results": results}
 
 
