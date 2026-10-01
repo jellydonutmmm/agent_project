@@ -81,7 +81,13 @@ def run(conn: sqlite3.Connection) -> None:
     results = search()
     logger.info("search returned %d results", len(results))
     for item in results:
-        process_item(conn, item)
+        try:
+            process_item(conn, item)
+        except Exception:
+            # The tools handle their own external-call failures; this catches
+            # anything left (e.g. a SQLite error, a malformed result) so one bad
+            # item can't halt the rest of the run.
+            logger.exception("error processing item %r", item.url)
 
 
 def main() -> None:

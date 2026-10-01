@@ -132,3 +132,22 @@ def test_posts_are_spaced_apart(
 
     agent.process_item(conn, _item("https://b.com/2", "Completely different news"))
     sleep_mock.assert_called_once_with(agent.MIN_POST_INTERVAL_SECONDS)
+
+
+def test_run_continues_after_an_item_raises(
+    conn: sqlite3.Connection,
+    mocks: dict[str, MagicMock],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mocks["evaluate"].side_effect = [
+        RuntimeError("bad item"),
+        Evaluation(True, "big news"),
+    ]
+    mocks["search"].return_value = [
+        _item("https://a.com/1", "First story about layoffs"),
+        _item("https://b.com/2", "Completely different acquisition news"),
+    ]
+    agent.run(conn)
+
+    assert mocks["post"].call_count == 1
+    assert "error processing item 'https://a.com/1'" in caplog.text

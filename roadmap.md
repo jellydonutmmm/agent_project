@@ -66,7 +66,7 @@ Establish this before any tool module is built, so every module (starting with `
 - [x] Add event-stream logging via Python's `logging` module: emit a log line at each pipeline stage (found, evaluated, decision, notified) as items move through, in addition to the row-state audit trail in `store.py` — `process_item()` in `agent.py` logs `found:`, `evaluated:`, `decision:`, `notified:` (plus `skipped duplicate:` and failure warnings)
 - [x] Chain search → dedup → evaluate → notify → log as the only place these tools are combined — `run()` / `process_item()` in `agent.py`; items are inserted on find, a failed evaluation leaves the row unevaluated, a failed Slack post leaves `notified_at` unset; tests in `tests/test_agent.py`
 - [x] Space out Slack posts within a run (at least ~1 second apart, per Slack's webhook limit documented in `notify.py`) so several notifications in one run don't trigger 429s — `_wait_for_post_slot()` in `agent.py` sleeps up to `MIN_POST_INTERVAL_SECONDS` before each post after the first
-- [ ] Ensure a single item's failure (bad search result, malformed content) is caught/logged without halting the run
+- [x] Ensure a single item's failure (bad search result, malformed content) is caught/logged without halting the run — `run()` wraps each `process_item()` call, logging the traceback and moving on to the next item
 - [ ] Add run-level logging/summary (items found, evaluated, notified, errored)
 - [ ] Write an end-to-end test with all external calls mocked, asserting the full run completes despite one failing item
 
