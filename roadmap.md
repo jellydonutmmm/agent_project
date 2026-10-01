@@ -93,8 +93,8 @@ Enforced automatically on every commit by a pre-commit hook (`.pre-commit-config
 ## 10. Manual verification ("done" bar per CLAUDE.md)
 
 - [ ] Create and add the three credentials to `.env`; confirm `.env` is gitignored
-  - [ ] Tavily API key (free tier, no card) → `TAVILY_API_KEY`
-  - [ ] Anthropic API key → `ANTHROPIC_API_KEY`
+  - [x] Tavily API key (free tier, no card) → `TAVILY_API_KEY` — verified with one real call
+  - [x] Anthropic API key → `ANTHROPIC_API_KEY` — verified with one real call
   - [ ] Slack setup, then the webhook URL → `SLACK_WEBHOOK_URL`:
     - [ ] Create a free Slack workspace and a channel for the agent's posts (e.g. `#game-news`)
     - [ ] Create a Slack app for that workspace and turn on Incoming Webhooks
