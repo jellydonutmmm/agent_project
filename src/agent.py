@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+import time
 from datetime import UTC, datetime
 
 from src import store
@@ -19,6 +20,21 @@ from src.notify import build_message, post_to_slack
 from src.search import SearchResult, search
 
 logger = logging.getLogger(__name__)
+
+# Slack allows ~1 message/second per webhook (see notify.py); space posts apart
+# so several notifications in one run don't trigger 429s.
+MIN_POST_INTERVAL_SECONDS = 1.0
+_last_post_at: float | None = None
+
+
+def _wait_for_post_slot() -> None:
+    """Sleep as needed so posts are at least MIN_POST_INTERVAL_SECONDS apart."""
+    global _last_post_at
+    if _last_post_at is not None:
+        remaining = MIN_POST_INTERVAL_SECONDS - (time.monotonic() - _last_post_at)
+        if remaining > 0:
+            time.sleep(remaining)
+    _last_post_at = time.monotonic()
 
 
 def _now() -> str:
@@ -51,7 +67,9 @@ def process_item(conn: sqlite3.Connection, item: SearchResult) -> None:
     if not evaluation.relevant:
         return
 
-    if post_to_slack(build_message(item, evaluation.reason)):
+    message = build_message(item, evaluation.reason)
+    _wait_for_post_slot()
+    if post_to_slack(message):
         store.mark_notified(conn, item_id, _now())
         logger.info("notified: id=%d", item_id)
     else:

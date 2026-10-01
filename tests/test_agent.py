@@ -23,6 +23,15 @@ def _item(
     return SearchResult(url=url, title=title, source="a.com", content="body")
 
 
+@pytest.fixture(autouse=True)
+def sleep_mock(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Never really sleep in tests; reset the post-spacing state."""
+    mock = MagicMock()
+    monkeypatch.setattr(agent.time, "sleep", mock)
+    monkeypatch.setattr(agent, "_last_post_at", None)
+    return mock
+
+
 @pytest.fixture
 def mocks(monkeypatch: pytest.MonkeyPatch) -> dict[str, MagicMock]:
     m = {
@@ -109,3 +118,17 @@ def test_run_processes_every_search_result(
     agent.run(conn)
 
     assert mocks["post"].call_count == 2
+
+
+def test_posts_are_spaced_apart(
+    conn: sqlite3.Connection,
+    mocks: dict[str, MagicMock],
+    sleep_mock: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(agent.time, "monotonic", MagicMock(return_value=100.0))
+    agent.process_item(conn, _item("https://a.com/1", "First story about layoffs"))
+    sleep_mock.assert_not_called()  # first post never waits
+
+    agent.process_item(conn, _item("https://b.com/2", "Completely different news"))
+    sleep_mock.assert_called_once_with(agent.MIN_POST_INTERVAL_SECONDS)
