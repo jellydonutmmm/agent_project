@@ -92,14 +92,14 @@ Enforced automatically on every commit by a pre-commit hook (`.pre-commit-config
 
 ## 10. Manual verification ("done" bar per CLAUDE.md)
 
-- [ ] Create and add the three credentials to `.env`; confirm `.env` is gitignored
+- [x] Create and add the three credentials to `.env`; confirm `.env` is gitignored
   - [x] Tavily API key (free tier, no card) → `TAVILY_API_KEY` — verified with one real call
   - [x] Anthropic API key → `ANTHROPIC_API_KEY` — verified with one real call
-  - [ ] Slack setup, then the webhook URL → `SLACK_WEBHOOK_URL`:
-    - [ ] Create a free Slack workspace and a channel for the agent's posts (e.g. `#game-news`)
-    - [ ] Create a Slack app for that workspace and turn on Incoming Webhooks
-    - [ ] Add a webhook to the channel and copy its URL
-    - [ ] Set the channel's notification preference to "all new messages" on desktop and phone
+  - [x] Slack setup, then the webhook URL → `SLACK_WEBHOOK_URL` — test message posted and checked on screen:
+    - [x] Create a free Slack workspace and a channel for the agent's posts (e.g. `#game-news`)
+    - [x] Create a Slack app for that workspace and turn on Incoming Webhooks
+    - [x] Add a webhook to the channel and copy its URL
+    - [x] Set the channel's notification preference to "all new messages" on desktop and phone
 - [ ] Run the full pipeline end-to-end locally against real APIs at least once
 - [ ] Manually verify a real Slack notification renders correctly (not just logged correctly)
 - [ ] Confirm a simulated failure (e.g. bad search result) doesn't halt the run
