@@ -38,13 +38,22 @@ Scheduled run (GitHub Actions, daily)
 ## Running it locally
 
 ```bash
-git clone [repo-url]
-cd [repo-name]
-python -m venv venv && source venv/bin/activate
+git clone https://github.com/jellydonutmmm/agent_project.git
+cd agent_project
+python -m venv venv && source venv/bin/activate   # Windows (PowerShell): venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-# add TAVILY_API_KEY, ANTHROPIC_API_KEY, and SLACK_WEBHOOK_URL to .env
-python agent.py
+# add TAVILY_API_KEY, ANTHROPIC_API_KEY, and SLACK_WEBHOOK_URL to .env (see Credentials)
+set -a && source .env && set +a                   # the agent reads real environment variables, not .env itself
+python -m src.agent
 ```
+
+A run writes its history to `agent.db` and its log to `agent.log` in the current directory (both gitignored).
+
+## Scheduling
+
+The agent runs once a day on a GitHub Actions schedule (`.github/workflows/daily-run.yml`, 13:00 UTC), which is free for public repos and doesn't depend on any personal machine being on. It can also be started by hand from the Actions tab. Daily keeps it at about 510 Tavily queries a month (17 queries x 30 days), under the free tier's 1,000; a 6-hour cadence would need about 2,040. Daily freshness is enough for industry-trend news.
+
+GitHub's runners start empty each time, so the SQLite history is saved to a `state` branch after each run and restored before the next. Because the repo is public, that branch is public too: it holds only news URLs, titles and the model's relevance reasons, never secrets.
 
 ## Credentials
 
@@ -65,11 +74,28 @@ Rotate / revoke: on the same API keys page, create a new key, update `.env` and 
 
 ## Search topics
 
-Queries cover video game development industry signals: studio layoffs/closures, hiring surges, engine and platform trends (Unreal, Unity, Godot), funding/acquisitions, and major publisher/studio announcements. The exact query list lives in `search.py`.
+Queries cover video game development industry signals: studio layoffs/closures, hiring surges, engine and platform trends (Unreal, Unity, Godot), funding/acquisitions, and major publisher/studio announcements. The exact query list lives in `src/search.py`.
 
 ## Known limitations
 
-[Fill in as you build — e.g. "relevance judgment is a single LLM call with no human-in-the-loop override yet" or "dedup is title-similarity based and may miss reworded duplicates."]
+Findings from building and from the first real run (76 items):
+
+**Dedup**
+- Duplicate detection is URL-exact plus title similarity (`difflib`, threshold 0.85). The same article under a different URL is not caught by the URL check: tracking parameters such as `?ref=...` or `&vl=en` make it look new. 8 of the 76 first-run URLs had query strings.
+- Title similarity misses the same story with differently structured headlines, reordered wording, and short titles. See `CLAUDE.md` for the full list.
+
+**Evaluation**
+- Each item is judged by a single LLM call from the search snippet, not the full page, with no human override. Decisions can vary between runs.
+- The first prompt let through index pages, homepages, profile pages and old announcements (about 13 of 21 "relevant" items on the first run). The prompt now rejects those and judges age against today's date, which also drops some borderline recent items, such as a survey report from eight months earlier.
+- The prompt leans "not relevant" when unsure, so it prefers missing a minor item to sending a noisy one.
+- Search results include non-news (YouTube, Wikipedia, vendor pages), which costs evaluation calls even when they're rejected.
+
+**Pipeline**
+- An item whose evaluation or Slack post fails is recorded and then skipped on later runs, not retried.
+- Tavily returned no `source` for any of the 76 results, so Slack links are labeled "link" instead of the outlet name.
+- The first run has no history, so it posts a large batch at once (21 notifications). Later runs should be much quieter.
+- Slack posts are spaced about a second apart to stay under its webhook rate limit. A long batch therefore takes a while.
+- Scheduled GitHub Actions runs can start a few minutes late, and GitHub pauses scheduled workflows in repos with no activity for 60 days.
 
 ## Demo
 
