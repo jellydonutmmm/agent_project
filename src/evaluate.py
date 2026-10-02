@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 import anthropic
@@ -34,6 +35,15 @@ An item is NOT relevant if it is:
 - opinion or speculation with no new fact behind it
 - an old story re-surfaced, a listicle, or marketing/promotional content
 - about the games industry only in passing
+- a page that is not a report of one specific event, even when its topic fits: a
+  homepage, category/topic/tag index, news feed or aggregator page, company profile
+  or directory entry, product/pricing/documentation page, Wikipedia-style overview,
+  or evergreen explainer. Such pages describe a topic or a site, not a development.
+  Judge the page itself, not what its links or sidebar headlines might lead to.
+- old news: the item's own event happened well before today's date (given with the
+  item), e.g. an announcement from several years ago. Judge the date of the event,
+  not the date the page was last crawled; if no date can be established and the
+  item reads as a standing page or old announcement, treat it as old.
 
 Judge from the title and content given. When unsure, lean not relevant: a missed
 minor item costs less than a noisy notification.
@@ -89,6 +99,7 @@ def _client() -> anthropic.Anthropic:
 
 def _format_item(item: SearchResult) -> str:
     return (
+        f"Today's date: {datetime.now(UTC).date().isoformat()}\n"
         f"Title: {item.title}\n"
         f"Source: {item.source or 'unknown'}\n"
         f"URL: {item.url}\n"

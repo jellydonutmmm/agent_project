@@ -1,4 +1,5 @@
 import logging
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -157,3 +158,11 @@ def test_evaluate_client_setup_failure_returns_safe_default(
     monkeypatch.setattr(evaluate, "_client", boom)
 
     assert evaluate.evaluate(ITEM).failed
+
+
+def test_item_text_includes_todays_date_for_staleness_judgment() -> None:
+    item = SearchResult(url="https://a.com/1", title="T", source=None, content="C")
+
+    text = evaluate._format_item(item)
+
+    assert f"Today's date: {datetime.now(UTC).date().isoformat()}" in text

@@ -47,7 +47,7 @@ Establish this before any tool module is built, so every module (starting with `
 
 ## 5. `evaluate.py` — Claude relevance evaluation
 
-- [x] Design the evaluation prompt for video game industry relevance — `SYSTEM_PROMPT` in `evaluate.py`; leans "not relevant" when unsure
+- [x] Design the evaluation prompt for video game industry relevance — `SYSTEM_PROMPT` in `evaluate.py`; leans "not relevant" when unsure; revised after the first real run (2026-10-01) to reject index/category/homepage/profile/pricing pages and old news — the item text now includes today's date so the model can judge age. Re-checked on a fresh search: 13 of the 21 earlier "relevant" items flipped to not relevant (index pages, a 2022 acquisition announcement, profile pages), none flipped the other way, and the new relevant items were real events
 - [x] Implement structured output parsing: `relevant: bool`, `reason: str` (never free text) — `EVALUATION_SCHEMA` (for constraining the response) plus `parse_evaluation()`, which raises `MalformedEvaluationError` on invalid output
 - [x] Implement the Claude Sonnet call via `anthropic` SDK — `evaluate()` calls `claude-sonnet-5-5` (effort `low`) with `EVALUATION_SCHEMA` and parses the reply; API errors and malformed output still propagate until the next item adds the boundary handling
 - [x] Handle malformed/unexpected LLM output gracefully (retry or safe default + log) — `evaluate()` now never raises: one retry on malformed output/refusal/`max_tokens`, then a safe default `Evaluation(relevant=False, failed=True)`; API errors are caught and logged at the boundary. The `failed` flag lets `agent.py` (Step 7) tell a failed evaluation from a real "not relevant" so failed items aren't marked evaluated
