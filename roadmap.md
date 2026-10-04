@@ -86,8 +86,8 @@ Enforced automatically on every commit by a pre-commit hook (`.pre-commit-config
 
 - [x] Decide and document run cadence (every 24 hours — ~510 Tavily queries/month vs. the 1,000/month free-tier limit) and the freshness-vs-API-cost tradeoff
 - [x] Set up the scheduler: a GitHub Actions scheduled workflow (`.github/workflows/daily-run.yml`, daily at 13:00 UTC, plus a manual "Run workflow" button) replaces cron, so the agent doesn't depend on a personal machine being on. Free for public repos. Runners are ephemeral, so `agent.db` is restored from / saved to a dedicated `state` branch each run (a single force-pushed commit, so it never grows; public along with the repo, holds only news URLs/titles and reasons)
-- [ ] Add the three secrets (`TAVILY_API_KEY`, `ANTHROPIC_API_KEY`, `SLACK_WEBHOOK_URL`) as GitHub repository secrets (Settings → Secrets and variables → Actions) — requires the credentials from Section 10
-- [ ] Trigger the workflow manually once and confirm: the run succeeds, the `state` branch appears with `agent.db`, and a second manual run skips items as duplicates
+- [x] Add the three secrets (`TAVILY_API_KEY`, `ANTHROPIC_API_KEY`, `SLACK_WEBHOOK_URL`) as GitHub repository secrets (Settings → Secrets and variables → Actions) — requires the credentials from Section 10
+- [x] Trigger the workflow manually once and confirm: the run succeeds, the `state` branch appears with `agent.db`, and a second manual run skips items as duplicates — 2026-10-04: first run saved the `state` branch; the next run on the Node 24 action versions restored it and skipped 67 of 81 results as duplicates (searched 81, found 14, evaluated 14, notified 0, errored 0). Tavily returns somewhat different results each call, so a few new items per run is normal
 - [ ] Confirm scheduled runs keep firing (GitHub disables scheduled workflows in repos with no activity for 60 days; re-enable from the Actions tab if that happens)
 
 ## 10. Manual verification ("done" bar per CLAUDE.md)
