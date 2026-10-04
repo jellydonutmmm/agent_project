@@ -102,10 +102,15 @@ Enforced automatically on every commit by a pre-commit hook (`.pre-commit-config
     - [x] Set the channel's notification preference to "all new messages" on desktop and phone
 - [x] Run the full pipeline end-to-end locally against real APIs at least once — 2026-10-01: searched 78, found 76, evaluated 76, notified 21, errored 0, in 4m48s (about 4s per item, mostly the evaluation call)
 - [x] Manually verify a real Slack notification renders correctly (not just logged correctly) — checked on screen after the 2026-10-01 local run (real LLM summaries)
-- [ ] Confirm a simulated failure (e.g. bad search result) doesn't halt the run
+- [x] Confirm a simulated failure (e.g. bad search result) doesn't halt the run — 2026-10-04, real Tavily + Claude, throwaway DB, bogus Slack webhook: (A) two malformed results injected among 6 real ones: both logged and counted as errored, the 6 real items still processed; (B) invalid Anthropic key: all 6 evaluations failed (errored=8 with the 2 bad results), run still finished. Not exercised: a failing Slack post on a real relevant item (covered by the mocked tests). Finding: with a dead key the run still exits success and the day's items are never retried — see the follow-up items below
 
 ## 11. Documentation cleanup
 
 - [x] Fill in README "Known limitations" section with actual findings (dedup false negatives, evaluation edge cases, etc.)
 - [x] Add a demo screenshot or sample decision log to README — sample decision log from a real GitHub Actions run (2026-10-04); no Slack screenshot
 - [x] Fill in README run cadence placeholder to match what was implemented — new "Scheduling" section; also fixed the run command (`python -m src.agent`), clone URL, and the `.env` loading step
+
+## 12. Follow-ups from the failure check
+
+- [ ] Retry items whose evaluation failed: today a failed item keeps its row (unevaluated), so later runs skip it as a duplicate and an outage (e.g. an expired API key) permanently drops that day's items
+- [ ] Make a broken run visible: exit non-zero (so the Actions run shows red) and/or post a Slack alert when every evaluation in a run fails, since a dead key currently looks like a quiet news day
