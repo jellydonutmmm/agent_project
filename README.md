@@ -13,18 +13,23 @@ Built partly as a practical tool for tracking my own field (game development), a
 - **Tool design:** the agent has three narrowly-scoped tools — web search, a relevance-evaluation step (LLM call with structured output), and a Slack webhook notifier — kept separate so each is independently testable
 - **Dedup:** every processed item is checked against a local SQLite store (by URL and title similarity) before it reaches the LLM evaluation step, to avoid wasting calls on repeats
 - **Judgment step:** the LLM outputs a structured decision (relevant: true/false + a one-line reason) for each new item, rather than a free-text response — this keeps the decision auditable and easy to log
-- **Error handling:** a failure on one item (bad search result, malformed content) is caught and logged without halting the run; Slack webhook calls retry with backoff on transient failures
+- **Error handling:** a failure on one item (bad search result, malformed content) is caught and logged without halting the run; Slack webhook calls retry with backoff on transient failures. An item whose evaluation fails is kept and retried on later runs (up to 3 attempts). If a run as a whole looks broken (search returns nothing, or every evaluation fails) the agent posts a warning to Slack and exits non-zero, so a dead API key can't pass for a quiet news day
 - **Observability:** every item processed — found, evaluated, decision, reasoning, timestamp — is persisted to SQLite, giving a full audit trail of what the agent has seen and decided
+- **Quality gate:** every commit runs a pre-commit hook: `ruff` format and lint, `mypy --strict`, `pytest` with a 90% coverage floor, and a `detect-secrets` scan that blocks committed keys. External services are mocked in tests, including an end-to-end test of a full run with one failing item
 
 ## Architecture
 
 ```
 Scheduled run (GitHub Actions, daily)
+  → Restore SQLite history from the `state` branch
   → Search step: Tavily API queries video game industry topics
   → Dedup: check against SQLite history
   → Evaluation step: Claude judges relevance, returns structured decision + reason
+      (items whose evaluation failed in an earlier run are retried here too)
   → Notify: relevant items summarized and posted to Slack via webhook
   → Log: every item's outcome persisted to SQLite
+  → Save SQLite history back to the `state` branch
+  → Broken run (nothing searched, or every evaluation failed): Slack alert + non-zero exit
 ```
 
 ## Tech stack
@@ -34,6 +39,8 @@ Scheduled run (GitHub Actions, daily)
 - LLM: Claude (Sonnet) via the `anthropic` Python SDK — used for relevance evaluation and summarization
 - Storage: SQLite
 - Notification: Slack incoming webhook
+- Scheduling: GitHub Actions (daily cron, free for public repos)
+- Tooling: `ruff`, `mypy` (strict), `pytest` + `pytest-cov`, `detect-secrets`, `pip-audit`, `pre-commit`
 
 ## Running it locally
 
@@ -49,6 +56,18 @@ python -m src.agent
 
 A run writes its history to `agent.db` and its log to `agent.log` in the current directory (both gitignored).
 
+## Development
+
+```bash
+pip install -r requirements.txt
+pre-commit install            # once per clone: runs the quality gate on every commit
+ruff format . && ruff check . && mypy . && pytest
+```
+
+`pytest` fails if coverage of `src/` drops below 90%. Commit with the venv active, because the pre-commit hooks use the venv's tools. Periodically, and before deploying, run `pip-audit -r requirements.txt` (it needs network, so it's a manual hook: `pre-commit run --hook-stage manual pip-audit`).
+
+To run the scheduled job by hand, open the repo's Actions tab, pick "Daily run" and click "Run workflow". (The "Re-run" button replays the old commit instead of the current code.)
+
 ## Scheduling
 
 The agent runs once a day on a GitHub Actions schedule (`.github/workflows/daily-run.yml`, 13:00 UTC), which is free for public repos and doesn't depend on any personal machine being on. It can also be started by hand from the Actions tab. Daily keeps it at about 510 Tavily queries a month (17 queries x 30 days), under the free tier's 1,000; a 6-hour cadence would need about 2,040. Daily freshness is enough for industry-trend news.
@@ -58,6 +77,31 @@ GitHub's runners start empty each time, so the SQLite history is saved to a `sta
 ## Credentials
 
 Keys go in `.env` locally (gitignored) and in GitHub repository secrets for the scheduled run. Never paste them into code, chat or commits.
+
+### Tavily
+Purpose: web search for the daily queries.
+Env var: `TAVILY_API_KEY`
+Limits / cost: free tier, 1,000 queries a month, no card required. The 17 daily queries use about 510 a month.
+1. Go to https://tavily.com and sign up.
+2. Open the dashboard and copy your API key (it starts with `tvly-`).
+3. Add `TAVILY_API_KEY=<value>` to `.env`.
+4. Verify with one small search (one query uses one of the monthly credits).
+5. For the scheduled run, add the same value as a repository secret named `TAVILY_API_KEY`.
+
+Rotate / revoke: regenerate the key from the Tavily dashboard, then update `.env` and the GitHub secret.
+
+### Slack
+Purpose: posts relevant items, and run-level alerts, to one channel.
+Env var: `SLACK_WEBHOOK_URL`
+Limits / cost: free plan is enough. Incoming webhooks allow about 1 message per second, and the agent spaces its posts to stay under that.
+1. Create a free Slack workspace and a channel for the posts, for example `#game-news`.
+2. Go to https://api.slack.com/apps, choose Create New App, From scratch, name it, and pick the workspace.
+3. Open Incoming Webhooks and turn it on, then Add New Webhook to Workspace and pick the channel.
+4. Copy the webhook URL (it looks like `https://hooks.slack.com/services/...`) and add `SLACK_WEBHOOK_URL=<value>` to `.env`. Treat it as a secret: anyone with it can post to the channel.
+5. Set the channel's notifications to "all new messages" on desktop and phone.
+6. For the scheduled run, add the same value as a repository secret named `SLACK_WEBHOOK_URL`.
+
+Rotate / revoke: on the app's Incoming Webhooks page, remove the webhook and add a new one, then update `.env` and the GitHub secret.
 
 ### Anthropic
 Purpose: relevance evaluation and Slack summaries (Claude Sonnet).
