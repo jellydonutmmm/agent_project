@@ -99,4 +99,21 @@ Findings from building and from the first real run (76 items):
 
 ## Demo
 
-[Screenshot of a Slack notification, or a sample log of a run's decisions]
+An excerpt from a real scheduled-style run on GitHub Actions (2026-10-04), lightly trimmed: timestamps shortened to the time, some reasons cut with "…", and uninteresting lines left out. Each item moves through `found` → `evaluated` → `decision` → `notified`, and the run ends with a summary line.
+
+```
+20:57:14 search returned 80 results
+20:57:14 skipped duplicate: Layoffs | GamesIndustry.biz (https://www.gamesindustry.biz/topics/layoffs)
+20:57:14 found: id=76 Inside the latest round of mass layoffs at Xbox (https://www.gamedeveloper.com/production/-good-work-is-not-going-to-save-your-job-at-this-company-laid-off-xbox-devs-condemn-microsoft)
+20:57:16 evaluated: id=76
+20:57:16 decision: id=76 relevant=True reason=Reports on mass layoffs at Xbox studios (id Software, Bethesda, ZeniMax Online) confirmed by Xbox CEO Asha Sharma, with laid-off staff describing impacts on id Tech and Doom support teams. The layoffs date from July 6 and the story is a recent follow-up, so it is still a concrete, substantive layoff development.
+20:57:19 notified: id=76
+20:57:19 found: id=77 What Is Happening With Games Industry Layoffs? - Kai's Game Dev Blog (https://kaiwueest.com/insights/layoffs)
+20:57:21 decision: id=77 relevant=False reason=This is an evergreen blog explainer on the history of games industry layoffs (2021 expansion, pandemic funding), not a report of one specific new event, so it describes a topic rather than a current development.
+...
+20:57:31 decision: id=82 relevant=False reason=The item is a Unity press release from GDC 2025 about planned Unity 6 updates, which is roughly 18 months before today's date of 2026-10-04, so it is old news. It is also largely promotional product-roadmap content.
+...
+20:58:17 run summary: searched=80 duplicates=52 found=28 evaluated=28 notified=1 errored=0
+```
+
+Of the 80 results, 52 were already in the history and skipped without an LLM call, and 28 were new. The agent judged 27 of those not relevant (index pages, evergreen explainers, vendor marketing, old announcements) and posted the one concrete, recent development to Slack.

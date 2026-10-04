@@ -107,5 +107,5 @@ Enforced automatically on every commit by a pre-commit hook (`.pre-commit-config
 ## 11. Documentation cleanup
 
 - [x] Fill in README "Known limitations" section with actual findings (dedup false negatives, evaluation edge cases, etc.)
-- [ ] Add a demo screenshot or sample decision log to README
+- [x] Add a demo screenshot or sample decision log to README — sample decision log from a real GitHub Actions run (2026-10-04); no Slack screenshot
 - [x] Fill in README run cadence placeholder to match what was implemented — new "Scheduling" section; also fixed the run command (`python -m src.agent`), clone URL, and the `.env` loading step
