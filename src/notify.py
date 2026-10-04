@@ -113,6 +113,11 @@ def build_message(
     return format_message(item, summarize_item(item, reason, client))
 
 
+def format_alert(text: str) -> str:
+    """Format an operational alert (not a news item) in Slack's mrkdwn."""
+    return f":warning: *Game news agent needs attention*\n{_escape(text)}"
+
+
 def _is_transient(exc: requests.RequestException) -> bool:
     """Worth retrying: no HTTP response (timeout, connection), 429, or 5xx."""
     if exc.response is None:

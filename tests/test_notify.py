@@ -313,3 +313,12 @@ def test_post_to_slack_does_not_retry_invalid_url(
 
     assert post.call_count == 1
     sleep_mock.assert_not_called()
+
+
+def test_format_alert_marks_it_as_an_alert_and_escapes_text() -> None:
+    message = notify.format_alert("All 3 evaluations failed <check key> & retry")
+
+    assert message == (
+        ":warning: *Game news agent needs attention*\n"
+        "All 3 evaluations failed &lt;check key&gt; &amp; retry"
+    )

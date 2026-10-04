@@ -91,7 +91,9 @@ Findings from building and from the first real run (76 items):
 - Search results include non-news (YouTube, Wikipedia, vendor pages), which costs evaluation calls even when they're rejected.
 
 **Pipeline**
-- An item whose evaluation or Slack post fails is recorded and then skipped on later runs, not retried.
+- An item whose evaluation fails is kept (with its content) and retried on later runs, up to 3 attempts in total, so a short outage doesn't lose items. After 3 failed attempts it's given up on, so an outage longer than about three daily runs still drops that day's items.
+- An item whose Slack post fails is recorded as evaluated and is not retried, so it is never posted.
+- If a run as a whole looks broken (search returns nothing, or every evaluation fails), the agent posts a warning to the Slack channel and exits non-zero, so the GitHub Actions run shows red. A partial failure, such as a few bad items, does not trigger this.
 - Tavily returned no `source` for any of the 76 results, so Slack links are labeled "link" instead of the outlet name.
 - The first run has no history, so it posts a large batch at once (21 notifications). Later runs should be much quieter.
 - Slack posts are spaced about a second apart to stay under its webhook rate limit. A long batch therefore takes a while.

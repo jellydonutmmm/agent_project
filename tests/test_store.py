@@ -146,3 +146,53 @@ def test_write_db_error_is_logged_and_reraised(
         )
 
     assert "SQLite error in insert_item" in caplog.text
+
+
+def test_insert_stores_content_and_defaults_attempts(conn: sqlite3.Connection) -> None:
+    store.insert_item(conn, "https://a.com/1", "T", "s", "t", content="body text")
+    item = store.get_by_url(conn, "https://a.com/1")
+
+    assert item is not None
+    assert item.content == "body text"
+    assert item.eval_attempts == 0
+
+
+def test_get_unevaluated_filters_by_state_and_attempts(
+    conn: sqlite3.Connection,
+) -> None:
+    failed_once = store.insert_item(conn, "https://a.com/1", "A", "s", "t")
+    exhausted = store.insert_item(conn, "https://a.com/2", "B", "s", "t")
+    done = store.insert_item(conn, "https://a.com/3", "C", "s", "t")
+    store.record_failed_evaluation(conn, failed_once)
+    for _ in range(3):
+        store.record_failed_evaluation(conn, exhausted)
+    store.update_evaluation(conn, done, True, "ok")
+
+    items = store.get_unevaluated(conn, max_attempts=3)
+
+    assert [item.id for item in items] == [failed_once]
+    assert items[0].eval_attempts == 1
+
+
+def test_init_adds_new_columns_to_an_existing_database(tmp_path: object) -> None:
+    db_path = f"{tmp_path}/old.db"
+    old = sqlite3.connect(db_path)
+    old.execute(
+        "CREATE TABLE items (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "url TEXT NOT NULL UNIQUE, title TEXT NOT NULL, source TEXT, "
+        "found_at TEXT NOT NULL, evaluated INTEGER NOT NULL DEFAULT 0, "
+        "relevant INTEGER, reason TEXT, notified_at TEXT)"
+    )
+    old.execute(
+        "INSERT INTO items (url, title, found_at) VALUES ('https://a.com/1', 'T', 't')"
+    )
+    old.commit()
+    old.close()
+
+    conn = store.connect(db_path)
+
+    item = store.get_by_url(conn, "https://a.com/1")
+    assert item is not None
+    assert item.content == "" and item.eval_attempts == 0
+    conn.close()
+    store.connect(db_path).close()  # running the migration again is harmless

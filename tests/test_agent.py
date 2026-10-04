@@ -161,7 +161,10 @@ def test_run_summary_counts_each_outcome(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.INFO, logger="src.agent")
-    store.insert_item(conn, "https://old.com/1", "Already seen story", "x", "t")
+    old_id = store.insert_item(
+        conn, "https://old.com/1", "Already seen story", "x", "t"
+    )
+    store.update_evaluation(conn, old_id, False, "old")
     mocks["search"].return_value = [
         _item("https://old.com/1", "Already seen story"),  # duplicate
         _item("https://a.com/1", "Relevant layoffs story"),  # notified
@@ -176,6 +179,107 @@ def test_run_summary_counts_each_outcome(
     summary = agent.run(conn)
 
     assert summary == agent.RunSummary(
-        searched=4, duplicates=1, found=3, evaluated=2, notified=1, errored=1
+        searched=4,
+        duplicates=1,
+        found=3,
+        evaluated=2,
+        notified=1,
+        errored=1,
+        evaluation_failures=1,
     )
     assert "run summary: searched=4 duplicates=1 found=3" in caplog.text
+
+
+def test_failed_evaluation_is_retried_on_the_next_run_from_stored_content(
+    conn: sqlite3.Connection, mocks: dict[str, MagicMock]
+) -> None:
+    mocks["search"].return_value = [_item()]
+    mocks["evaluate"].return_value = Evaluation(False, "boom", failed=True)
+    first = agent.run(conn)
+
+    mocks["search"].return_value = []  # nothing new; only the stored item remains
+    mocks["evaluate"].return_value = Evaluation(True, "big news")
+    second = agent.run(conn)
+
+    assert first.retried == 0  # not retried in the run that failed it
+    assert mocks["evaluate"].call_count == 2
+    retried_item = mocks["evaluate"].call_args.args[0]
+    assert retried_item.content == "body"  # stored content was kept
+    assert second.retried == 1 and second.evaluated == 1 and second.notified == 1
+    stored = store.get_by_url(conn, "https://a.com/1")
+    assert stored is not None and stored.evaluated and stored.notified_at
+
+
+def test_retries_stop_after_max_attempts(
+    conn: sqlite3.Connection, mocks: dict[str, MagicMock]
+) -> None:
+    mocks["search"].return_value = [_item()]
+    mocks["evaluate"].return_value = Evaluation(False, "boom", failed=True)
+    agent.run(conn)  # attempt 1
+    mocks["search"].return_value = []
+    for _ in range(agent.MAX_EVAL_ATTEMPTS + 2):
+        agent.run(conn)
+
+    assert mocks["evaluate"].call_count == agent.MAX_EVAL_ATTEMPTS
+
+
+def test_alert_is_posted_when_every_evaluation_fails(
+    conn: sqlite3.Connection, mocks: dict[str, MagicMock]
+) -> None:
+    mocks["search"].return_value = [
+        _item("https://a.com/1", "First story about layoffs"),
+        _item("https://b.com/2", "Completely different acquisition news"),
+    ]
+    mocks["evaluate"].return_value = Evaluation(False, "boom", failed=True)
+
+    summary = agent.run(conn)
+
+    assert summary.problem() is not None
+    mocks["post"].assert_called_once()
+    alert = mocks["post"].call_args.args[0]
+    assert "needs attention" in alert and "All 2 evaluations failed" in alert
+
+
+def test_alert_is_posted_when_search_returns_nothing(
+    conn: sqlite3.Connection, mocks: dict[str, MagicMock]
+) -> None:
+    mocks["search"].return_value = []
+
+    summary = agent.run(conn)
+
+    assert summary.problem() is not None
+    assert "Search returned no results" in mocks["post"].call_args.args[0]
+
+
+def test_no_alert_when_some_evaluations_succeed(
+    conn: sqlite3.Connection, mocks: dict[str, MagicMock]
+) -> None:
+    mocks["search"].return_value = [
+        _item("https://a.com/1", "First story about layoffs"),
+        _item("https://b.com/2", "Completely different acquisition news"),
+    ]
+    mocks["evaluate"].side_effect = [
+        Evaluation(False, "noise"),
+        Evaluation(False, "boom", failed=True),
+    ]
+
+    summary = agent.run(conn)
+
+    assert summary.problem() is None
+    mocks["post"].assert_not_called()
+
+
+@pytest.mark.parametrize(("broken", "expected_code"), [(True, 1), (False, 0)])
+def test_main_exit_code_reflects_run_health(
+    monkeypatch: pytest.MonkeyPatch,
+    mocks: dict[str, MagicMock],
+    broken: bool,
+    expected_code: int,
+) -> None:
+    monkeypatch.setattr(agent, "configure_logging", MagicMock())
+    real_connect = store.connect
+    monkeypatch.setattr(store, "connect", lambda: real_connect(":memory:"))
+    mocks["search"].return_value = [] if broken else [_item()]
+    mocks["evaluate"].return_value = Evaluation(False, "noise")
+
+    assert agent.main() == expected_code

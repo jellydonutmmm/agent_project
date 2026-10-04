@@ -94,7 +94,13 @@ def test_full_run_completes_despite_one_failing_item(
     summary = agent.run(conn)
 
     assert summary == agent.RunSummary(
-        searched=3, duplicates=0, found=3, evaluated=2, notified=1, errored=1
+        searched=3,
+        duplicates=0,
+        found=3,
+        evaluated=2,
+        notified=1,
+        errored=1,
+        evaluation_failures=1,
     )
     # Exactly the relevant item reached Slack, with the LLM summary in it.
     post.assert_called_once()

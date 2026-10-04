@@ -45,9 +45,20 @@ CREATE TABLE IF NOT EXISTS items (
     evaluated INTEGER NOT NULL DEFAULT 0,
     relevant INTEGER,
     reason TEXT,
-    notified_at TEXT
+    notified_at TEXT,
+    content TEXT NOT NULL DEFAULT '',
+    eval_attempts INTEGER NOT NULL DEFAULT 0
 )
 """
+
+# Columns added after the first release. Databases created before them (e.g. the
+# saved history on the `state` branch) get them added by init_db.
+MIGRATIONS = {
+    "content": "ALTER TABLE items ADD COLUMN content TEXT NOT NULL DEFAULT ''",
+    "eval_attempts": (
+        "ALTER TABLE items ADD COLUMN eval_attempts INTEGER NOT NULL DEFAULT 0"
+    ),
+}
 
 
 @dataclass
@@ -61,6 +72,9 @@ class Item:
     relevant: bool | None
     reason: str | None
     notified_at: str | None
+    # Kept so an item whose evaluation failed can be retried on a later run.
+    content: str = ""
+    eval_attempts: int = 0
 
 
 @_log_db_errors
@@ -74,6 +88,10 @@ def connect(db_path: str = "agent.db") -> sqlite3.Connection:
 @_log_db_errors
 def init_db(conn: sqlite3.Connection) -> None:
     conn.execute(SCHEMA)
+    existing = {row["name"] for row in conn.execute("PRAGMA table_info(items)")}
+    for column, statement in MIGRATIONS.items():
+        if column not in existing:
+            conn.execute(statement)
     conn.commit()
 
 
@@ -88,17 +106,25 @@ def _row_to_item(row: sqlite3.Row) -> Item:
         relevant=None if row["relevant"] is None else bool(row["relevant"]),
         reason=row["reason"],
         notified_at=row["notified_at"],
+        content=row["content"],
+        eval_attempts=row["eval_attempts"],
     )
 
 
 @_log_db_errors
 def insert_item(
-    conn: sqlite3.Connection, url: str, title: str, source: str, found_at: str
+    conn: sqlite3.Connection,
+    url: str,
+    title: str,
+    source: str,
+    found_at: str,
+    content: str = "",
 ) -> int:
     """Insert a newly found item. Raises sqlite3.IntegrityError on duplicate url."""
     cursor = conn.execute(
-        "INSERT INTO items (url, title, source, found_at) VALUES (?, ?, ?, ?)",
-        (url, title, source, found_at),
+        "INSERT INTO items (url, title, source, found_at, content) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (url, title, source, found_at, content),
     )
     conn.commit()
     assert cursor.lastrowid is not None
@@ -142,3 +168,21 @@ def mark_notified(conn: sqlite3.Connection, item_id: int, notified_at: str) -> N
         (notified_at, item_id),
     )
     conn.commit()
+
+
+@_log_db_errors
+def record_failed_evaluation(conn: sqlite3.Connection, item_id: int) -> None:
+    conn.execute(
+        "UPDATE items SET eval_attempts = eval_attempts + 1 WHERE id = ?", (item_id,)
+    )
+    conn.commit()
+
+
+@_log_db_errors
+def get_unevaluated(conn: sqlite3.Connection, max_attempts: int) -> list[Item]:
+    """Items whose evaluation failed and has been tried fewer than `max_attempts` times."""
+    rows = conn.execute(
+        "SELECT * FROM items WHERE evaluated = 0 AND eval_attempts < ? ORDER BY id",
+        (max_attempts,),
+    ).fetchall()
+    return [_row_to_item(row) for row in rows]

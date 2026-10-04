@@ -112,5 +112,6 @@ Enforced automatically on every commit by a pre-commit hook (`.pre-commit-config
 
 ## 12. Follow-ups from the failure check
 
-- [ ] Retry items whose evaluation failed: today a failed item keeps its row (unevaluated), so later runs skip it as a duplicate and an outage (e.g. an expired API key) permanently drops that day's items
-- [ ] Make a broken run visible: exit non-zero (so the Actions run shows red) and/or post a Slack alert when every evaluation in a run fails, since a dead key currently looks like a quiet news day
+- [x] Retry items whose evaluation failed (implemented 2026-10-04: `items` gains `content` and `eval_attempts`, migrated automatically on existing databases; failed items are retried on later runs, up to 3 attempts, from a snapshot taken at the start of the run so an item isn't retried in the run that failed it). Original problem: today a failed item keeps its row (unevaluated), so later runs skip it as a duplicate and an outage (e.g. an expired API key) permanently drops that day's items
+- [x] Make a broken run visible (implemented 2026-10-04: `RunSummary.problem()` flags a run where search returned nothing or every evaluation failed; `agent.py` then posts a Slack alert and `main()` exits 1). Original problem: exit non-zero (so the Actions run shows red) and/or post a Slack alert when every evaluation in a run fails, since a dead key currently looks like a quiet news day
+- [ ] Retry items whose Slack post failed (same silent loss as failed evaluations, not covered by the items above)
